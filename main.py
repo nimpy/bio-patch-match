@@ -20,7 +20,8 @@ image_path = os.path.join(data_dir, image_filename)
 label_path = os.path.join(data_dir, label_filename)
 query_patch_path = os.path.join(data_dir, query_patch_filename)
 
-result_visualisation_dir = 'images/res_vis_' + Path(image_filename).stem
+result_visualisation_dir = 'images/res_vis_' + Path(image_filename).stem + Path(query_patch_path).stem
+result_visualisation_labels_dir = 'images/res_vis_lab_' + Path(image_filename).stem + Path(query_patch_path).stem  # TODO add a space inbetween
 
 EPS = 0.0001
 patch_size = 65
@@ -153,6 +154,91 @@ def plot_patch_matches_and_metrics_for_different_nr_similar_patches(nr_similar_p
         print('\n\n')
 
 
+def plot_patch_matches_and_metrics_for_different_nr_similar_patches2(nr_similar_patches_list, image, label,
+                                                                patches_x_coords, patches_y_coords, patches_positions):
+    maximum_correct_pixels = patch_size ** 2
+
+    for nr_similar_patches in nr_similar_patches_list:
+
+        print(nr_similar_patches)
+
+        results_patches_x_coords = patches_x_coords[:nr_similar_patches]
+        results_patches_y_coords = patches_y_coords[:nr_similar_patches]
+        results_patches_positions = patches_positions[:nr_similar_patches]
+
+        prediction_image = np.zeros(image.shape, dtype=np.uint8)
+
+        # calculating the percentage of correctly labelled pixels and the number of completely failed matches
+        results_patches_correct_pixels = []
+        failed_count = 0
+        for i, patch_match in enumerate(results_patches_positions):
+            patch_match_label = label[results_patches_x_coords[i]: results_patches_x_coords[i] + patch_size,
+                                results_patches_y_coords[i]: results_patches_y_coords[i] + patch_size]
+            correct_pixels = np.sum(patch_match_label == 1)  # assumes label 1 for the class of interest TODO generalise
+            results_patches_correct_pixels.append(correct_pixels / maximum_correct_pixels)
+            if correct_pixels == 0:
+                failed_count += 1
+
+            prediction_image[results_patches_x_coords[i]: results_patches_x_coords[i] + patch_size,
+                                results_patches_y_coords[i]: results_patches_y_coords[i] + patch_size] = 255
+        mean_correct_pixels = np.array(results_patches_correct_pixels).mean()
+
+
+        prediction_visualisation = visualise_segmentation(image / 255.0, label / 255.0, 1 - (prediction_image / 255.0))
+
+        # saving result visualisation
+        result_visualisation_file_name = Path(image_filename).stem + '_patchmatch' + str(nr_similar_patches).zfill(3) + '_correctpixels' + \
+            "{:.2f}".format(mean_correct_pixels * 100) + '_failed' + str(failed_count) + '_labels.png'
+
+        Path(result_visualisation_labels_dir).mkdir(parents=True, exist_ok=True)
+
+        # plotting
+        fig, ax = plt.subplots(1)
+        fig.set_size_inches(18.5, 10.5)
+        fig.set_dpi(100)
+        ax.imshow(prediction_visualisation)
+        plt.savefig(os.path.join(result_visualisation_labels_dir, result_visualisation_file_name), bbox_inches='tight')
+        plt.show()
+        print(mean_correct_pixels * 100)
+        print('failed:', failed_count)
+
+        print('\n\n')
+
+
+def visualise_segmentation(original, ground_truth, prediction, alpha=0.35):
+    assert original.shape == ground_truth.shape, "The shapes of images are not the same."
+    assert original.shape == prediction.shape, "The shapes of images are not the same."
+
+    print(original.shape)
+
+    # TODO check the type of arrays and whether it is in [0..1] or [0..255]
+    #      (For the moment, I assume np.float64 and [0..1])
+    # TODO generalise s.t. original isn't necessarily greyscale
+
+    img_vis = np.zeros((original.shape[0], original.shape[1], 3), dtype=np.float64)
+
+    for i in range(original.shape[0]):
+        for j in range(original.shape[1]):
+            if (ground_truth[i, j] >= 0.5) and (prediction[i, j] >= 0.5):
+                img_vis[i, j, 0] = original[i, j]
+                img_vis[i, j, 1] = original[i, j]
+                img_vis[i, j, 2] = original[i, j]
+            elif (ground_truth[i, j] < 0.5) and (prediction[i, j] < 0.5):  # blue for TP
+                img_vis[i, j, 0] = original[i, j] * (1.0 - alpha) + 0. * alpha
+                img_vis[i, j, 1] = original[i, j] * (1.0 - alpha) + 0. * alpha
+                img_vis[i, j, 2] = original[i, j] * (1.0 - alpha) + 1. * alpha
+            elif (ground_truth[i, j] < 0.5) and (prediction[i, j] >= 0.5):  # red for FN
+                img_vis[i, j, 0] = original[i, j] * (1.0 - alpha) + 1. * alpha
+                img_vis[i, j, 1] = original[i, j] * (1.0 - alpha) + 0. * alpha
+                img_vis[i, j, 2] = original[i, j] * (1.0 - alpha) + 0. * alpha
+            elif (ground_truth[i, j] >= 0.5) and (prediction[i, j], 0.5):  # orange for FP
+                img_vis[i, j, 0] = original[i, j] * (1.0 - alpha) + 1. * alpha
+                img_vis[i, j, 1] = original[i, j] * (1.0 - alpha) + 0.5 * alpha
+                img_vis[i, j, 2] = original[i, j] * (1.0 - alpha) + 0. * alpha
+
+    return img_vis
+
+
 if __name__ == '__main__':
     image, label, query_patch = load_images()
     descriptor = load_descriptors()
@@ -162,7 +248,7 @@ if __name__ == '__main__':
 
     nr_similar_patches_list = [i * 10 + 6 for i in range(12)]  # zum Beispiel
 
-    plot_patch_matches_and_metrics_for_different_nr_similar_patches(nr_similar_patches_list, image, label,
+    plot_patch_matches_and_metrics_for_different_nr_similar_patches2(nr_similar_patches_list, image, label,
                                                                     patches_x_coords, patches_y_coords,
                                                                     patches_positions)
 
