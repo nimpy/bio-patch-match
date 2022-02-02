@@ -12,16 +12,19 @@ weights_dir = 'weights/'
 weights_path = os.path.join(weights_dir, 'ae_best.pth.tar')
 
 data_dir = 'images/'
-image_filename = 'data_0165.png'
-label_filename = 'data_0165_label.png'
-query_patch_filename = 'data_0165_mito_crop.png'
+image_filename = 'data_0209.png'  # 0267
+label_filename = 'data_0209_label.png'  # 0267
+query_patch_filename1 = 'data_0165_mito_crop.png'
+query_patch_filename2 = 'data_0267_mito_crop.png'
 
 image_path = os.path.join(data_dir, image_filename)
 label_path = os.path.join(data_dir, label_filename)
-query_patch_path = os.path.join(data_dir, query_patch_filename)
+query_patch_path1 = os.path.join(data_dir, query_patch_filename1)
+query_patch_path2 = os.path.join(data_dir, query_patch_filename2)
 
-result_visualisation_dir = 'images/res_vis_' + Path(image_filename).stem + Path(query_patch_path).stem
-result_visualisation_labels_dir = 'images/res_vis_lab_' + Path(image_filename).stem + Path(query_patch_path).stem  # TODO add a space inbetween
+result_visualisation_dir = 'images/res_vis_' + Path(image_filename).stem + "_" + Path(query_patch_path1).stem  + "_" + Path(query_patch_path2).stem
+result_visualisation_labels_dir = 'images/res_vis_lab_' + Path(image_filename).stem + "_" + Path(query_patch_path1).stem + "_" + Path(query_patch_path2).stem
+
 
 EPS = 0.0001
 patch_size = 65
@@ -32,8 +35,9 @@ nr_similar_patches = 16
 def load_images():
     image = imageio.imread(image_path)
     label = imageio.imread(label_path)
-    query_patch = imageio.imread(query_patch_path)
-    return image, label, query_patch
+    query_patch1 = imageio.imread(query_patch_path1)
+    query_patch2 = imageio.imread(query_patch_path2)
+    return image, label, query_patch1, query_patch2
 
 
 def load_descriptors():
@@ -91,6 +95,50 @@ def retrieve_patch_matches(query_patch, image, descriptor, patch_size, compare_s
             if diff < EPS:  # when using VAE check it's not the same patch
                 counter_compare_patches += 1
                 continue
+
+            # sorting
+            for i in range(len(patches_diffs)):
+                if diff < patches_diffs[i]:
+                    patches_diffs.insert(i, diff)
+                    patches_x_coords.insert(i, x_compare)
+                    patches_y_coords.insert(i, y_compare)
+                    patches_positions.insert(i, counter_compare_patches)
+                    break
+
+            counter_compare_patches += 1
+
+    return patches_diffs, patches_x_coords, patches_y_coords, patches_positions
+
+
+def retrieve_patch_matches_for_2queries(query_patch1, query_patch2, image, descriptor, patch_size, compare_stride):
+    image_height = image.shape[0]
+    image_width = image.shape[1]
+
+    query_patch_descr1 = compute_descriptor(descriptor, query_patch1)
+    query_patch_descr2 = compute_descriptor(descriptor, query_patch2)
+
+    counter_compare_patches = 0
+
+    patches_diffs = [1000000000]
+    patches_x_coords = [-1]
+    patches_y_coords = [-1]
+    patches_positions = [-1]
+
+    for y_compare in range(0, image_width - patch_size + 1, compare_stride):
+        for x_compare in range(0, image_height - patch_size + 1, compare_stride):
+
+            compare_patch = image[x_compare: x_compare + patch_size, y_compare: y_compare + patch_size]
+
+            compare_patch_descr = compute_descriptor(descriptor, compare_patch)
+
+            diff1 = calculate_ssd(query_patch_descr1, compare_patch_descr)
+            diff2 = calculate_ssd(query_patch_descr2, compare_patch_descr)
+
+            if diff1 < EPS or diff2 < EPS:  # when using VAE check it's not the same patch
+                counter_compare_patches += 1
+                continue
+
+            diff = diff1 + diff2
 
             # sorting
             for i in range(len(patches_diffs)):
@@ -240,11 +288,13 @@ def visualise_segmentation(original, ground_truth, prediction, alpha=0.35):
 
 
 if __name__ == '__main__':
-    image, label, query_patch = load_images()
+    image, label, query_patch1, query_patch2 = load_images()
     descriptor = load_descriptors()
 
-    patches_diffs, patches_x_coords, patches_y_coords, patches_positions = retrieve_patch_matches(query_patch, image,
-                                                                    descriptor, patch_size, compare_stride)
+    # patches_diffs, patches_x_coords, patches_y_coords, patches_positions = retrieve_patch_matches(query_patch, image,
+    #                                                                 descriptor, patch_size, compare_stride)
+    patches_diffs, patches_x_coords, patches_y_coords, patches_positions = retrieve_patch_matches_for_2queries(query_patch1,
+                                                            query_patch2, image, descriptor, patch_size, compare_stride)
 
     nr_similar_patches_list = [i * 10 + 6 for i in range(12)]  # zum Beispiel
 
