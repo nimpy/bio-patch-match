@@ -1,28 +1,26 @@
 import os
 from pathlib import Path
-import torch
+
 import imageio
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
-import models.ae as ae
-
-weights_dir = 'weights/'
-weights_path = os.path.join(weights_dir, 'ae_best.pth.tar')
+from descriptors_encoding import load_descriptors, compute_descriptor, calculate_ssd
+from patch_retrieval import retrieve_patch_matches
 
 data_dir = 'images/'
 image_filename = 'data_0267.png'  # 0267
 label_filename = 'data_0267_label.png'  # 0267
 query_patch_filename1 = 'data_0165_mito_crop.png'
-query_patch_filename2 = 'data_0267_mito_negative_crop2.png'
+query_patch_filename2 = 'data_0209_mito_crop3.png'  # data_0267_mito_negative_crop2
 
 image_path = os.path.join(data_dir, image_filename)
 label_path = os.path.join(data_dir, label_filename)
 query_patch_path1 = os.path.join(data_dir, query_patch_filename1)
 query_patch_path2 = os.path.join(data_dir, query_patch_filename2)
 
-result_visualisation_dir = 'images/res_vis_' + Path(image_filename).stem + "_" + Path(query_patch_path1).stem  + "_" + Path(query_patch_path2).stem
+result_visualisation_dir = 'images/res_vis_' + Path(image_filename).stem + "_" + Path(query_patch_path1).stem + "_" + Path(query_patch_path2).stem
 result_visualisation_labels_dir = 'images/res_vis_lab_' + Path(image_filename).stem + "_" + Path(query_patch_path1).stem + "_" + Path(query_patch_path2).stem
 
 
@@ -40,118 +38,7 @@ def load_images():
     return image, label, query_patch1, query_patch2
 
 
-def load_descriptors():
-    model = ae.AE(32)
-    model.load_state_dict(torch.load(weights_path)['state_dict'])
-    model.eval()
-    # model = model.cuda()  # TODO make it use GPU
-    return model
 
-
-def calculate_ssd(img1, img2):
-    """Computing the sum of squared differences (SSD) between two images."""
-    if img1.shape != img2.shape:
-        raise Exception("Images don't have the same shape: ", img1.shape, "and", img2.shape)
-    return np.sum((np.array(img1, dtype=np.float32) - np.array(img2, dtype=np.float32))**2)
-
-
-def compute_descriptor(descr, patch):
-    variational = False  # isinstance(descr, vae.BetaVAE) or isinstance(descr, vae_ir.BetaVAE)
-    patch = np.array(patch)
-    patch = patch / 255.0
-    patch = np.expand_dims(np.expand_dims(patch, axis=0), axis=0)
-    patch = torch.from_numpy(patch).float()
-    if variational:
-        patch_encoding, _, _ = descr.encode(patch)
-    else:
-        patch_encoding = descr.encode(patch)
-    patch_encoding = patch_encoding.detach().numpy()
-    patch_encoding = patch_encoding.reshape(patch_encoding.shape[0], np.product(patch_encoding.shape[1:]))
-    return patch_encoding[0]
-
-
-def retrieve_patch_matches(query_patch, image, descriptor, patch_size, compare_stride):
-    image_height = image.shape[0]
-    image_width = image.shape[1]
-
-    query_patch_descr = compute_descriptor(descriptor, query_patch)
-
-    counter_compare_patches = 0
-
-    patches_diffs = [1000000000]
-    patches_x_coords = [-1]
-    patches_y_coords = [-1]
-    patches_positions = [-1]
-
-    for y_compare in range(0, image_width - patch_size + 1, compare_stride):
-        for x_compare in range(0, image_height - patch_size + 1, compare_stride):
-
-            compare_patch = image[x_compare: x_compare + patch_size, y_compare: y_compare + patch_size]
-
-            compare_patch_descr = compute_descriptor(descriptor, compare_patch)
-
-            diff = calculate_ssd(query_patch_descr, compare_patch_descr)
-
-            if diff < EPS:  # when using VAE check it's not the same patch
-                counter_compare_patches += 1
-                continue
-
-            # sorting
-            for i in range(len(patches_diffs)):
-                if diff < patches_diffs[i]:
-                    patches_diffs.insert(i, diff)
-                    patches_x_coords.insert(i, x_compare)
-                    patches_y_coords.insert(i, y_compare)
-                    patches_positions.insert(i, counter_compare_patches)
-                    break
-
-            counter_compare_patches += 1
-
-    return patches_diffs, patches_x_coords, patches_y_coords, patches_positions
-
-
-def retrieve_patch_matches_for_2queries(query_patch1, query_patch2, image, descriptor, patch_size, compare_stride):
-    image_height = image.shape[0]
-    image_width = image.shape[1]
-
-    query_patch_descr1 = compute_descriptor(descriptor, query_patch1)
-    query_patch_descr2 = compute_descriptor(descriptor, query_patch2)
-
-    counter_compare_patches = 0
-
-    patches_diffs = [1000000000]
-    patches_x_coords = [-1]
-    patches_y_coords = [-1]
-    patches_positions = [-1]
-
-    for y_compare in range(0, image_width - patch_size + 1, compare_stride):
-        for x_compare in range(0, image_height - patch_size + 1, compare_stride):
-
-            compare_patch = image[x_compare: x_compare + patch_size, y_compare: y_compare + patch_size]
-
-            compare_patch_descr = compute_descriptor(descriptor, compare_patch)
-
-            diff1 = calculate_ssd(query_patch_descr1, compare_patch_descr)
-            diff2 = calculate_ssd(query_patch_descr2, compare_patch_descr)
-
-            if diff1 < EPS or diff2 < EPS:  # when using VAE check it's not the same patch
-                counter_compare_patches += 1
-                continue
-
-            diff = diff1 + diff2
-
-            # sorting
-            for i in range(len(patches_diffs)):
-                if diff < patches_diffs[i]:
-                    patches_diffs.insert(i, diff)
-                    patches_x_coords.insert(i, x_compare)
-                    patches_y_coords.insert(i, y_compare)
-                    patches_positions.insert(i, counter_compare_patches)
-                    break
-
-            counter_compare_patches += 1
-
-    return patches_diffs, patches_x_coords, patches_y_coords, patches_positions
 
 
 def plot_patch_matches_and_metrics_for_different_nr_similar_patches(nr_similar_patches_list, image, label,
@@ -434,12 +321,12 @@ if __name__ == '__main__':
 
     nr_similar_patches_list = [i * 10 + 6 for i in range(12)]  # zum Beispiel
 
-    # plot_patch_matches_and_metrics_for_different_nr_similar_patches2_OR(nr_similar_patches_list, image, label,
-    #                                                 patches_x_coords1, patches_y_coords1, patches_positions1,
-    #                                                 patches_x_coords2, patches_y_coords2, patches_positions2)
-
-    plot_patch_matches_and_metrics_for_different_nr_similar_patches2_1ANDNOT2(nr_similar_patches_list, image, label,
+    plot_patch_matches_and_metrics_for_different_nr_similar_patches2_OR(nr_similar_patches_list, image, label,
                                                     patches_x_coords1, patches_y_coords1, patches_positions1,
                                                     patches_x_coords2, patches_y_coords2, patches_positions2)
+
+    # plot_patch_matches_and_metrics_for_different_nr_similar_patches2_1ANDNOT2(nr_similar_patches_list, image, label,
+    #                                                 patches_x_coords1, patches_y_coords1, patches_positions1,
+    #                                                 patches_x_coords2, patches_y_coords2, patches_positions2)
 
     print()
