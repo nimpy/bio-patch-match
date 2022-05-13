@@ -8,12 +8,13 @@ import matplotlib.patches as patches
 
 from descriptors_encoding import load_descriptors, compute_descriptor, calculate_ssd
 from patch_retrieval import retrieve_patch_matches
+from visualisation import plot_patch_diffs, visualise_segmentation
 
 data_dir = 'images/'
 image_filename = 'data_0267.png'  # 0267
 label_filename = 'data_0267_label.png'  # 0267
 query_patch_filename1 = 'data_0165_mito_crop.png'
-query_patch_filename2 = 'data_0209_mito_crop3.png'  # data_0267_mito_negative_crop2
+query_patch_filename2 = 'data_0267_mito_negative_crop2.png'  # data_0267_mito_negative_crop2  data_0209_mito_crop3
 
 image_path = os.path.join(data_dir, image_filename)
 label_path = os.path.join(data_dir, label_filename)
@@ -24,7 +25,6 @@ result_visualisation_dir = 'images/res_vis_' + Path(image_filename).stem + "_" +
 result_visualisation_labels_dir = 'images/res_vis_lab_' + Path(image_filename).stem + "_" + Path(query_patch_path1).stem + "_" + Path(query_patch_path2).stem
 
 
-EPS = 0.0001
 patch_size = 65
 compare_stride = 8
 nr_similar_patches = 16
@@ -272,40 +272,6 @@ def plot_patch_matches_and_metrics_for_different_nr_similar_patches2_1ANDNOT2(nr
         print('\n\n')
 
 
-def visualise_segmentation(original, ground_truth, prediction, alpha=0.35):
-    assert original.shape == ground_truth.shape, "The shapes of images are not the same."
-    assert original.shape == prediction.shape, "The shapes of images are not the same."
-
-    print(original.shape)
-
-    # TODO check the type of arrays and whether it is in [0..1] or [0..255]
-    #      (For the moment, I assume np.float64 and [0..1])
-    # TODO generalise s.t. original isn't necessarily greyscale
-
-    img_vis = np.zeros((original.shape[0], original.shape[1], 3), dtype=np.float64)
-
-    for i in range(original.shape[0]):
-        for j in range(original.shape[1]):
-            if (ground_truth[i, j] >= 0.5) and (prediction[i, j] >= 0.5):
-                img_vis[i, j, 0] = original[i, j]
-                img_vis[i, j, 1] = original[i, j]
-                img_vis[i, j, 2] = original[i, j]
-            elif (ground_truth[i, j] < 0.5) and (prediction[i, j] < 0.5):  # blue for TP
-                img_vis[i, j, 0] = original[i, j] * (1.0 - alpha) + 0. * alpha
-                img_vis[i, j, 1] = original[i, j] * (1.0 - alpha) + 0. * alpha
-                img_vis[i, j, 2] = original[i, j] * (1.0 - alpha) + 1. * alpha
-            elif (ground_truth[i, j] < 0.5) and (prediction[i, j] >= 0.5):  # red for FN
-                img_vis[i, j, 0] = original[i, j] * (1.0 - alpha) + 1. * alpha
-                img_vis[i, j, 1] = original[i, j] * (1.0 - alpha) + 0. * alpha
-                img_vis[i, j, 2] = original[i, j] * (1.0 - alpha) + 0. * alpha
-            elif (ground_truth[i, j] >= 0.5) and (prediction[i, j], 0.5):  # orange for FP
-                img_vis[i, j, 0] = original[i, j] * (1.0 - alpha) + 1. * alpha
-                img_vis[i, j, 1] = original[i, j] * (1.0 - alpha) + 0.5 * alpha
-                img_vis[i, j, 2] = original[i, j] * (1.0 - alpha) + 0. * alpha
-
-    return img_vis
-
-
 if __name__ == '__main__':
     image, label, query_patch1, query_patch2 = load_images()
     descriptor = load_descriptors()
@@ -316,17 +282,22 @@ if __name__ == '__main__':
     patches_diffs2, patches_x_coords2, patches_y_coords2, patches_positions2 = retrieve_patch_matches(query_patch1, image,
                                                                     descriptor, patch_size, compare_stride)
 
+    plot_patch_diffs(patches_diffs1, "diffs__" + os.path.splitext(image_filename)[0] + "__" + os.path.splitext(query_patch_filename1)[0] + ".png")
+    # TODO diffs2
+
     # patches_diffs, patches_x_coords, patches_y_coords, patches_positions = retrieve_patch_matches_for_2queries(query_patch1,
     #                                                         query_patch2, image, descriptor, patch_size, compare_stride)
 
     nr_similar_patches_list = [i * 10 + 6 for i in range(12)]  # zum Beispiel
 
-    plot_patch_matches_and_metrics_for_different_nr_similar_patches2_OR(nr_similar_patches_list, image, label,
+    # plot_patch_matches_and_metrics_for_different_nr_similar_patches2_OR(nr_similar_patches_list, image, label,
+    #                                                 patches_x_coords1, patches_y_coords1, patches_positions1,
+    #                                                 patches_x_coords2, patches_y_coords2, patches_positions2)
+
+    plot_patch_matches_and_metrics_for_different_nr_similar_patches2_1ANDNOT2(nr_similar_patches_list, image, label,
                                                     patches_x_coords1, patches_y_coords1, patches_positions1,
                                                     patches_x_coords2, patches_y_coords2, patches_positions2)
 
-    # plot_patch_matches_and_metrics_for_different_nr_similar_patches2_1ANDNOT2(nr_similar_patches_list, image, label,
-    #                                                 patches_x_coords1, patches_y_coords1, patches_positions1,
-    #                                                 patches_x_coords2, patches_y_coords2, patches_positions2)
+
 
     print()
