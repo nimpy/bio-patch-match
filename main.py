@@ -6,8 +6,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
-from descriptors_encoding import load_descriptors, compute_descriptor, calculate_ssd
-from patch_retrieval import retrieve_patch_matches
+from descriptors_encoding import load_descriptors, compute_descriptor, calculate_diff
+from patch_retrieval import retrieve_patches_sorted_by_diff, prune_closest_n_patches, calculate_retrieval_score
 from visualisation import plot_patch_diffs, visualise_segmentation
 
 data_dir = 'images/'
@@ -28,6 +28,7 @@ result_visualisation_labels_dir = 'images/res_vis_lab_' + Path(image_filename).s
 patch_size = 65
 compare_stride = 8
 nr_similar_patches = 16
+positive_label_value = 1
 
 
 def load_images():
@@ -38,32 +39,21 @@ def load_images():
     return image, label, query_patch1, query_patch2
 
 
-
-
-
 def plot_patch_matches_and_metrics_for_different_nr_similar_patches(nr_similar_patches_list, image, label,
                                                                 patches_x_coords, patches_y_coords, patches_positions):
-    maximum_correct_pixels = patch_size ** 2
 
     for nr_similar_patches in nr_similar_patches_list:
 
         print(nr_similar_patches)
 
-        results_patches_x_coords = patches_x_coords[:nr_similar_patches]
-        results_patches_y_coords = patches_y_coords[:nr_similar_patches]
-        results_patches_positions = patches_positions[:nr_similar_patches]
+        # TODO rename vars: results_ to retrieved_
+        results_patches_x_coords, results_patches_y_coords, results_patches_positions = \
+            prune_closest_n_patches(nr_similar_patches, patches_x_coords, patches_y_coords, patches_positions)
 
         # calculating the percentage of correctly labelled pixels and the number of completely failed matches
-        results_patches_correct_pixels = []
-        failed_count = 0
-        for i, patch_match in enumerate(results_patches_positions):
-            patch_match_label = label[results_patches_x_coords[i]: results_patches_x_coords[i] + patch_size,
-                                results_patches_y_coords[i]: results_patches_y_coords[i] + patch_size]
-            correct_pixels = np.sum(patch_match_label == 1)  # assumes label 1 for the class of interest TODO generalise
-            results_patches_correct_pixels.append(correct_pixels / maximum_correct_pixels)
-            if correct_pixels == 0:
-                failed_count += 1
-        mean_correct_pixels = np.array(results_patches_correct_pixels).mean()
+        failed_count, mean_correct_pixels = \
+            calculate_retrieval_score(label, positive_label_value, patch_size, results_patches_positions,
+                                                           results_patches_x_coords, results_patches_y_coords)
 
         # plotting
         fig, ax = plt.subplots(1)
@@ -276,11 +266,11 @@ if __name__ == '__main__':
     image, label, query_patch1, query_patch2 = load_images()
     descriptor = load_descriptors()
 
-    patches_diffs1, patches_x_coords1, patches_y_coords1, patches_positions1 = retrieve_patch_matches(query_patch1, image,
-                                                                    descriptor, patch_size, compare_stride)
+    patches_diffs1, patches_x_coords1, patches_y_coords1, patches_positions1 = retrieve_patches_sorted_by_diff(query_patch1, image,
+                                                                                                               descriptor, patch_size, compare_stride)
 
-    patches_diffs2, patches_x_coords2, patches_y_coords2, patches_positions2 = retrieve_patch_matches(query_patch1, image,
-                                                                    descriptor, patch_size, compare_stride)
+    patches_diffs2, patches_x_coords2, patches_y_coords2, patches_positions2 = retrieve_patches_sorted_by_diff(query_patch1, image,
+                                                                                                               descriptor, patch_size, compare_stride)
 
     plot_patch_diffs(patches_diffs1, "diffs__" + os.path.splitext(image_filename)[0] + "__" + os.path.splitext(query_patch_filename1)[0] + ".png")
     # TODO diffs2
@@ -294,10 +284,13 @@ if __name__ == '__main__':
     #                                                 patches_x_coords1, patches_y_coords1, patches_positions1,
     #                                                 patches_x_coords2, patches_y_coords2, patches_positions2)
 
-    plot_patch_matches_and_metrics_for_different_nr_similar_patches2_1ANDNOT2(nr_similar_patches_list, image, label,
-                                                    patches_x_coords1, patches_y_coords1, patches_positions1,
-                                                    patches_x_coords2, patches_y_coords2, patches_positions2)
+    # plot_patch_matches_and_metrics_for_different_nr_similar_patches2_1ANDNOT2(nr_similar_patches_list, image, label,
+    #                                                 patches_x_coords1, patches_y_coords1, patches_positions1,
+    #                                                 patches_x_coords2, patches_y_coords2, patches_positions2)
 
+
+    plot_patch_matches_and_metrics_for_different_nr_similar_patches(nr_similar_patches_list, image, label,
+                                                                patches_x_coords1, patches_y_coords1, patches_positions1)
 
 
     print()

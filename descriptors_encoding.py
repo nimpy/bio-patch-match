@@ -17,7 +17,7 @@ def load_descriptors():
     return model
 
 
-def calculate_ssd(img1, img2):
+def calculate_diff(img1, img2):
     """Computing the sum of squared differences (SSD) between two images."""
     if img1.shape != img2.shape:
         raise Exception("Images don't have the same shape: ", img1.shape, "and", img2.shape)
