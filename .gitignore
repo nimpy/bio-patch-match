@@ -5,3 +5,4 @@ __pycache__/
 zimnica/
 images/
 weights/
+data/

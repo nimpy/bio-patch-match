@@ -29,7 +29,7 @@ result_visualisation_labels_dir = 'images/res_vis_lab_' + Path(image_filename).s
 patch_size = 65
 compare_stride = 8
 nr_similar_patches = 16
-positive_label_value = 1
+# positive_label_value = 1
 
 
 def load_images():
@@ -53,8 +53,8 @@ def plot_patch_matches_and_metrics_for_different_nr_similar_patches(nr_similar_p
 
         # calculating the percentage of correctly labelled pixels and the number of completely failed matches
         failed_count, mean_correct_pixels = \
-            calculate_retrieval_score(label, positive_label_value, patch_size, results_patches_positions,
-                                                           results_patches_x_coords, results_patches_y_coords)
+            calculate_retrieval_score(label, patch_size, results_patches_positions,
+                                      results_patches_x_coords, results_patches_y_coords)
 
         result_visualisation_file_name = Path(image_filename).stem + '_patchmatch' + str(nr_similar_patches).zfill(
             3) + '_correctpixels' + "{:.2f}".format(mean_correct_pixels * 100) + '_failed' + str(failed_count) + '.png'

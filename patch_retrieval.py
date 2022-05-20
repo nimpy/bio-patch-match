@@ -115,8 +115,8 @@ def calculate_percentage_correctly_labelled_pixels(label, positive_label_value, 
 
 
 # TODO could calculate here some other score...
-def calculate_retrieval_score(label, positive_label_value, patch_size, retrieved_patches_positions,
-                              retrieved_patches_x_coords, retrieved_patches_y_coords):
+def calculate_retrieval_score(label, patch_size, retrieved_patches_positions,
+                              retrieved_patches_x_coords, retrieved_patches_y_coords, positive_label_value=1):
     return calculate_percentage_correctly_labelled_pixels(label, positive_label_value, patch_size,
-                                                   retrieved_patches_positions, retrieved_patches_x_coords,
-                                                   retrieved_patches_y_coords)
+                                                          retrieved_patches_positions, retrieved_patches_x_coords,
+                                                          retrieved_patches_y_coords)[1]  # TODO change final evaluation
