@@ -1,11 +1,14 @@
 import os
 from pathlib import Path
+import time
 
 import imageio
 import numpy as np
 
 from patch_retrieval import retrieve_patches_sorted_by_diff, prune_closest_n_patches, calculate_retrieval_score
+from patch_retrieval import calculate_f1_score
 from descriptors_encoding import load_descriptors
+
 
 def is_score_better_than_best(current_score, best_score, maximise_score):
     if maximise_score:
@@ -25,7 +28,10 @@ def find_best_threshold(query_patches, images, labels, thresholds, descriptor, p
 
     for threshold in thresholds:
         scores = []
-        for query_patch in query_patches:
+        time_start = time.time()
+
+        for count_queries, query_patch in enumerate(query_patches):
+            count_images = 0
             for image, label in zip(images, labels):
 
                 patches_diffs, patches_x_coords, patches_y_coords, patches_positions = \
@@ -37,7 +43,8 @@ def find_best_threshold(query_patches, images, labels, thresholds, descriptor, p
 
                 score = calculate_retrieval_score(label, patch_size, retrieved_patches_positions,
                                                   retrieved_patches_x_coords, retrieved_patches_y_coords)
-                print(score)
+                print(threshold, count_queries, count_images, ":", score)
+                count_images += 1
                 scores.append(score)
         threshold_score = np.mean(np.array(scores))
         print("For threshold", threshold, "the score is", threshold_score)
@@ -45,6 +52,8 @@ def find_best_threshold(query_patches, images, labels, thresholds, descriptor, p
             best_threshold_score = threshold_score
             best_threshold = threshold
             print("   Found the best threshold so far:", best_threshold, "with the score: ", best_threshold_score)
+        time_end = time.time()
+        print("Time elapsed for one threshold evaluation", time_end - time_start)
 
     return best_threshold
 
@@ -73,7 +82,9 @@ if __name__ == '__main__':
     for query_patch_filename in query_patch_filenames:
         query_patches.append(imageio.imread(os.path.join(base_data_dir, query_patches_dir, query_patch_filename)))
 
-    thresholds = [6, 26, 46, 66]
+    thresholds = [6, 26, 46, 66, 86, 106]
+
+    print(len(thresholds), len(query_patches), len(images))
 
     descriptor = load_descriptors()
     patch_size = 65

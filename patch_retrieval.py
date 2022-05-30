@@ -1,6 +1,6 @@
 from descriptors_encoding import compute_descriptor, calculate_diff
 import numpy as np
-from sklearn.metrics import recall_score
+import sklearn.metrics
 
 
 EPS = 0.0001
@@ -119,7 +119,26 @@ def calculate_percentage_correctly_labelled_pixels(label, positive_label_value, 
 def calculate_sensitivity(label, positive_label_value, patch_size, retrieved_patches_positions,
                           retrieved_patches_x_coords, retrieved_patches_y_coords):
 
-    # TODO extract this to be a method, from here...
+    label, y_pred = make_segmented_image_from_retrieved_patches(label, positive_label_value, patch_size,
+                                                                retrieved_patches_x_coords, retrieved_patches_y_coords)
+
+    return sklearn.metrics.recall_score(np.array(label, dtype=np.uint8).flatten(),
+                                        np.array(y_pred, dtype=np.uint8).flatten(),
+                                        pos_label=positive_label_value)
+
+
+def calculate_f1_score(label, positive_label_value, patch_size, retrieved_patches_positions,
+                       retrieved_patches_x_coords, retrieved_patches_y_coords):
+
+    label, y_pred = make_segmented_image_from_retrieved_patches(label, positive_label_value, patch_size,
+                                                                retrieved_patches_x_coords, retrieved_patches_y_coords)
+    return sklearn.metrics.f1_score(np.array(label, dtype=np.uint8).flatten(),
+                                    np.array(y_pred, dtype=np.uint8).flatten(),
+                                    pos_label=positive_label_value)
+
+
+def make_segmented_image_from_retrieved_patches(label, positive_label_value, patch_size, retrieved_patches_x_coords,
+                                                retrieved_patches_y_coords):
     label = label / 255.0
     if positive_label_value == 0:
         y_pred = np.ones_like(label)
@@ -129,17 +148,20 @@ def calculate_sensitivity(label, positive_label_value, patch_size, retrieved_pat
         raise ValueError("Positive label value is strange -- it should be 0 or 1 but it is", positive_label_value)
     for x, y in zip(retrieved_patches_x_coords, retrieved_patches_y_coords):
         y_pred[x: x + patch_size, y: y + patch_size] = positive_label_value
-    # TODO ...until here
-
-    return recall_score(np.array(label, dtype=np.uint8).flatten(), np.array(y_pred, dtype=np.uint8).flatten(),
-                        pos_label=positive_label_value)
+    return label, y_pred
 
 
-# TODO calculate also f1 score!
 def calculate_retrieval_score(label, patch_size, retrieved_patches_positions,
                               retrieved_patches_x_coords, retrieved_patches_y_coords, positive_label_value=0):
     # return calculate_percentage_correctly_labelled_pixels(label, positive_label_value, patch_size,
     #                                                       retrieved_patches_positions, retrieved_patches_x_coords,
-    #                                                       retrieved_patches_y_coords)[1]  # TODO change final evaluation
-    return calculate_sensitivity(label, positive_label_value, patch_size, retrieved_patches_positions,
-                                 retrieved_patches_x_coords, retrieved_patches_y_coords)
+    #                                                       retrieved_patches_y_coords)[1]
+
+    sensitivity = calculate_sensitivity(label, positive_label_value, patch_size, retrieved_patches_positions,
+                                        retrieved_patches_x_coords, retrieved_patches_y_coords)
+    f1_score = calculate_f1_score(label, positive_label_value, patch_size, retrieved_patches_positions,
+                                  retrieved_patches_x_coords, retrieved_patches_y_coords)
+
+    print("              ", sensitivity, f1_score)
+    # return the average of sensitivity and f1 score
+    return (sensitivity + f1_score) * 0.5
