@@ -1,5 +1,6 @@
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
 
 import os
 import imageio
@@ -20,7 +21,7 @@ label_path = os.path.join(data_dir, label_filename)
 patch_size = 65
 compare_stride = 8
 
-mitochondria_threshold = 0.8
+mitochondria_threshold = 0.5
 
 if __name__ == '__main__':
     descriptor = load_descriptors()
@@ -59,21 +60,28 @@ if __name__ == '__main__':
 
     patch_labels = np.array(patch_labels)
 
-    # 2D visualisation
-    pca = PCA(n_components=2)
-    patch_descrs_transformed = pca.fit_transform(patch_descrs)
-    plt.scatter(patch_descrs_transformed[:, 0], patch_descrs_transformed[:, 1], c=patch_labels)
-    plt.savefig('images/plots/mitochondria_' + str(mitochondria_threshold) + '_2D-PCA_0209_' + datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + '.jpg')
-    plt.show()
+    # # 2D visualisation
+    # pca = PCA(n_components=2)
+    # patch_descrs_transformed = pca.fit_transform(patch_descrs)
+    # plt.scatter(patch_descrs_transformed[:, 0], patch_descrs_transformed[:, 1], c=patch_labels)
+    # plt.savefig('images/plots/mitochondria_' + str(mitochondria_threshold) + '_2D-PCA_0209_' + datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + '.jpg')
+    # plt.show()
+    #
+    # time.sleep(1)
+    #
+    # # 3D visualisation
+    # pca = PCA(n_components=3)
+    # patch_descrs_transformed = pca.fit_transform(patch_descrs)
+    # fig = plt.figure(figsize=(12, 12))
+    # ax = fig.add_subplot(projection='3d')
+    # ax.scatter(patch_descrs_transformed[:, 0], patch_descrs_transformed[:, 1], patch_descrs_transformed[:, 2], c=patch_labels)
+    # plt.savefig('images/plots/mitochondria_' + str(mitochondria_threshold) + '_3D-PCA_0209_' + datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + '.jpg')
+    # plt.show()
 
-    time.sleep(1)
-
-    # 3D visualisation
-    pca = PCA(n_components=3)
-    patch_descrs_transformed = pca.fit_transform(patch_descrs)
+    # t-SNE
+    patch_descrs_tSNE = TSNE(n_components=3, learning_rate='auto', init='random').fit_transform(patch_descrs)
     fig = plt.figure(figsize=(12, 12))
     ax = fig.add_subplot(projection='3d')
-    ax.scatter(patch_descrs_transformed[:, 0], patch_descrs_transformed[:, 1], patch_descrs_transformed[:, 2], c=patch_labels)
-    plt.savefig('images/plots/mitochondria_' + str(mitochondria_threshold) + '_3D-PCA_0209_' + datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + '.jpg')
+    ax.scatter(patch_descrs_tSNE[:, 0], patch_descrs_tSNE[:, 1], patch_descrs_tSNE[:, 2], c=patch_labels)
+    plt.savefig('images/plots/mitochondria_' + str(mitochondria_threshold) + '_tSNE_0209_' + datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + '.jpg')
     plt.show()
-
